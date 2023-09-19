@@ -6,58 +6,58 @@ library(emmeans)
 library(tidyverse)
 library(Kendall)
 
-emm_options(pbkrtest.limit = 28776, lmertest.limit = 28776)
+emm_options(pbkrtest.limit = 30000, lmertest.limit = 30000)
 
 ## read data ----
 ## read long-form data (created and cleaned by @Sabyasachee)
 data <- read.csv("data/long_video.csv")
 
 gender_data <- data %>%
-  group_by(key, program, lang, genre, year, gender) %>% 
+  group_by(file_key, program, lang, genre, year, gender) %>% 
   summarise(n = sum(faces), .groups = "drop") %>% 
-  group_by(key, program, lang, genre, year) %>% 
+  group_by(file_key, program, lang, genre, year) %>% 
   mutate(screentime = n / (sum(n) + 1e-23) * 100) %>% 
   ungroup()
 
 age_data <- data %>%
-  group_by(key, program, lang, genre, year, age) %>% 
+  group_by(file_key, program, lang, genre, year, age) %>% 
   summarise(n = sum(faces), .groups = "drop") %>% 
-  group_by(key, program, lang, genre, year) %>% 
+  group_by(file_key, program, lang, genre, year) %>% 
   mutate(screentime = n / (sum(n) + 1e-23) * 100) %>% 
   ungroup()
 
 skintone_data <- data %>%
-  group_by(key, program, lang, genre, year, skintone) %>% 
+  group_by(file_key, program, lang, genre, year, skintone) %>% 
   summarise(n = sum(faces), .groups = "drop") %>% 
-  group_by(key, program, lang, genre, year) %>% 
+  group_by(file_key, program, lang, genre, year) %>% 
   mutate(screentime = n / (sum(n) + 1e-23) * 100) %>% 
   ungroup()
 
 gender_x_age_data <- data %>%
-  group_by(key, program, lang, genre, year, gender, age) %>% 
+  group_by(file_key, program, lang, genre, year, gender, age) %>% 
   summarise(n = sum(faces), .groups = "drop") %>% 
-  group_by(key, program, lang, genre, year) %>% 
+  group_by(file_key, program, lang, genre, year) %>% 
   mutate(screentime = n / (sum(n) + 1e-23) * 100) %>% 
   ungroup()
 
 gender_x_skintone_data <- data %>%
-  group_by(key, program, lang, genre, year, gender, skintone) %>% 
+  group_by(file_key, program, lang, genre, year, gender, skintone) %>% 
   summarise(n = sum(faces), .groups = "drop") %>% 
-  group_by(key, program, lang, genre, year) %>% 
+  group_by(file_key, program, lang, genre, year) %>% 
   mutate(screentime = n / (sum(n) + 1e-23) * 100) %>% 
   ungroup()
 
 age_x_skintone_data <- data %>%
-  group_by(key, program, lang, genre, year, age, skintone) %>% 
+  group_by(file_key, program, lang, genre, year, age, skintone) %>% 
   summarise(n = sum(faces), .groups = "drop") %>% 
-  group_by(key, program, lang, genre, year) %>% 
+  group_by(file_key, program, lang, genre, year) %>% 
   mutate(screentime = n / (sum(n) + 1e-23) * 100) %>% 
   ungroup()
 
 gender_x_age_x_skintone_data <- data %>%
-  group_by(key, program, lang, genre, year, gender, age, skintone) %>% 
+  group_by(file_key, program, lang, genre, year, gender, age, skintone) %>% 
   summarise(n = sum(faces), .groups = "drop") %>% 
-  group_by(key, program, lang, genre, year) %>% 
+  group_by(file_key, program, lang, genre, year) %>% 
   mutate(screentime = n / (sum(n) + 1e-23) * 100) %>% 
   ungroup()
 
@@ -145,20 +145,20 @@ m_gender_x_age_x_skintone <- lmer(screentime ~ gender * age * skintone * year
                                   + (1|lang:gender:age:skintone)
                                   + (1|genre:gender:age:skintone),
                                   gender_x_age_x_skintone_data)
-gender_x_age_skintone_trends <- emtrends(m_gender_x_age_x_skintone, 
-                                         ~ skintone + age + gender, 
-                                         var="year") %>% 
-  as_tibble() %>% arrange(skintone, age, gender)
+# gender_x_age_x_skintone_trends <- emtrends(m_gender_x_age_x_skintone, 
+#                                          ~ skintone + age + gender, 
+#                                          var="year") %>% 
+#   as_tibble() %>% arrange(skintone, age, gender)
 
 ## plots
 # gender
 ggplot(gender_data, 
        aes(x = year, y = screentime, group = gender, color = gender)) + 
-  geom_point(alpha = 0.5) + 
+  geom_point(alpha = 0.5) +
   geom_smooth(method = "lm", se = FALSE) + 
   theme_minimal() + 
   labs(y = "Screentime Percentage of Gender Categories")
-ggsave("data/plots/gender_trends.png", device = "png")
+ggsave("data/plots/gender_trends.eps", device = "eps")
 
 ggplot(gender_data,
        aes(x = year, y = screentime, group = lang, color = lang)) +
@@ -167,16 +167,16 @@ ggplot(gender_data,
   theme_minimal() +
   labs(y = "Screentime Percentage of Gender Categories across Languages") +
   facet_wrap(~gender)
-ggsave("data/plots/gender_x_lang_trends.png", device = "png")
+ggsave("data/plots/gender_x_lang_trends.eps", device = "eps")
 
 # age
 ggplot(age_data, 
        aes(x = year, y = screentime, group = age, color = age)) + 
-  geom_point(alpha = 0.5) + 
+  geom_point(alpha = 0.5) +
   geom_smooth(method = "lm", se = FALSE) + 
   theme_minimal() + 
   labs(y = "Screentime Percentage of Age Categories")
-ggsave("data/plots/age_trends.png", device = "png")
+ggsave("data/plots/age_trends.eps", device = "eps")
 
 ggplot(age_data,
        aes(x = year, y = screentime, group = lang, color = lang)) +
@@ -185,16 +185,16 @@ ggplot(age_data,
   theme_minimal() +
   labs(y = "Screentime Percentage of Age Categories across Languages") +
   facet_wrap(~age)
-ggsave("data/plots/age_x_lang_trends.png", device = "png")
+ggsave("data/plots/age_x_lang_trends.eps", device = "eps")
 
 # skintone
 ggplot(skintone_data, 
        aes(x = year, y = screentime, group = skintone, color = skintone)) + 
-  geom_point(alpha = 0.5) + 
+  geom_point(alpha = 0.5) +
   geom_smooth(method = "lm", se = FALSE) + 
   theme_minimal() + 
   labs(y = "Screentime Percentage of Skintone Categories")
-ggsave("data/plots/skintone_trends.png", device = "png")
+ggsave("data/plots/skintone_trends.eps", device = "eps")
 
 ggplot(skintone_data,
        aes(x = year, y = screentime, group = lang, color = lang)) +
@@ -203,44 +203,44 @@ ggplot(skintone_data,
   theme_minimal() +
   labs(y = "Screentime Percentage of Skintone Categories across Languages") +
   facet_wrap(~skintone)
-ggsave("data/plots/skintone_x_lang_trends.png", device = "png")
+ggsave("data/plots/skintone_x_lang_trends.eps", device = "eps")
 
 # gender x age
 ggplot(gender_x_age_data, 
        aes(x = year, y = screentime, group = age, color = age)) + 
-  geom_point(alpha = 0.5) + 
+  geom_point(alpha = 0.5) +
   geom_smooth(method = "lm", se = FALSE) + 
   theme_minimal() + 
   labs(y = "Screentime Percentage of Age Groups Within Gender Categories") +
   facet_wrap(~gender)
-ggsave("data/plots/gender_x_age_trends.png", device = "png")
+ggsave("data/plots/gender_x_age_trends.eps", device = "eps")
 
 # gender x skintone
 ggplot(gender_x_skintone_data, 
        aes(x = year, y = screentime, group = skintone, color = skintone)) + 
-  geom_point(alpha = 0.5) + 
+  geom_point(alpha = 0.5) +
   geom_smooth(method = "lm", se = FALSE) + 
   theme_minimal() + 
   labs(y = "Screentime Percentage of Skintone Groups Within Gender Categories") +
   facet_wrap(~gender)
-ggsave("data/plots/gender_x_skintone_trends.png", device = "png")
+ggsave("data/plots/gender_x_skintone_trends.eps", device = "eps")
 
 # age x skintone
 ggplot(age_x_skintone_data, 
        aes(x = year, y = screentime, group = skintone, color = skintone)) + 
-  geom_point(alpha = 0.5) + 
+  geom_point(alpha = 0.5) +
   geom_smooth(method = "lm", se = FALSE) + 
   theme_minimal() + 
   labs(y = "Screentime Percentage of Skintone Groups Within Age Categories") +
   facet_wrap(~age)
-ggsave("data/plots/age_x_skintone_trends.png", device = "png")
+ggsave("data/plots/age_x_skintone_trends.eps", device = "eps")
 
 # gender x age x skintone
 ggplot(gender_x_age_x_skintone_data, 
        aes(x = year, y = screentime, group = skintone, color = skintone)) + 
-  geom_point(alpha = 0.5) + 
+  geom_point(alpha = 0.5) +
   geom_smooth(method = "lm", se = FALSE) + 
   theme_minimal() + 
   labs(y = "Screentime Percentage of Skintone Groups Within Gender and Age Categories") +
   facet_wrap(~gender*age, nrow = 4)
-ggsave("data/plots/gender_x_age_x_skintone_trends.png", device = "png")
+ggsave("data/plots/gender_x_age_x_skintone_trends.eps", device = "eps")

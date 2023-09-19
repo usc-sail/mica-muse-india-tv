@@ -15,10 +15,16 @@ def parse_duration(x):
     duration = 3600*h + 60*m + s
     return duration
 
+def drop_duplicates(df, key):
+    "drop all rows from df if they share same value on key column, but retain rows with NaN on key column"
+    notna_df = df[df[key].notna()].drop_duplicates(key, keep=False)
+    na_df = df[df[key].isna()]
+    return pd.concat((na_df, notna_df))
+
 def prepare_data():
     # set filenames
     video_analysis_file = "data/[MUSE India] [RP Outputs] - Muse_India_Study_yt_local.csv.csv"
-    language_analyis_files = [
+    language_analysis_files = [
         "data/[MUSE India] [Final] Language Analysis Results - bn.csv",
         "data/[MUSE India] [Final] Language Analysis Results - hi.csv",
         "data/[MUSE India] [Final] Language Analysis Results - kn.csv",
@@ -28,36 +34,38 @@ def prepare_data():
 
     # read the video analysis and language analysis dataframes
     video_analysis_df = pd.read_csv(video_analysis_file, index_col=None)
-    language_analyis_dfs = [pd.read_csv(language_analyis_file, index_col=None) 
-                            for language_analyis_file in language_analyis_files]
-    language_analyis_df = pd.concat(language_analyis_dfs)
+    language_analysis_dfs = [pd.read_csv(language_analysis_file, index_col=None) 
+                            for language_analysis_file in language_analysis_files]
+    language_analysis_df = pd.concat(language_analysis_dfs)
 
     # lower case program name
     video_analysis_df["Program name"] = video_analysis_df["Program name"].str.lower()
 
     # change language abbreviations to full form
-    language_analyis_df["Language"] = language_analyis_df["Language"].apply(full_form_language)
+    language_analysis_df["Language"] = language_analysis_df["Language"].apply(full_form_language)
 
-    # create key column
-    video_analysis_df["key"] = video_analysis_df["video_key"]
-    video_analysis_df.loc[video_analysis_df["key"].isna(), "key"] = (
-        video_analysis_df.loc[video_analysis_df["key"].isna(), "Cat No."])
-    language_analyis_df["key"] = language_analyis_df["Video ID"].str.strip(".mp4").str.strip(".mov")
+    # create key columns
+    language_analysis_df["Video ID"] = language_analysis_df["Video ID"].str.replace(r"\.m((p4)|(ov))$", "", regex=True)
+    video_analysis_df.rename(columns={"video_key": "youtube_key", "Cat No.": "file_key"}, inplace=True)
+    language_analysis_df.rename(columns={"Video ID": "key"}, inplace=True)
 
     # remove samples with same keys
-    video_analysis_df.drop_duplicates("key", keep=False, inplace=True)
-    language_analyis_df.drop_duplicates("key", keep=False, inplace=True)
+    video_analysis_df = drop_duplicates(video_analysis_df, "file_key")
+    video_analysis_df = drop_duplicates(video_analysis_df, "youtube_key")
+    language_analysis_df.drop_duplicates("key", keep=False, inplace=True)
 
     # parse the duration columns
     video_analysis_df["Ats(viewer)(sec)"] = video_analysis_df["Ats(viewer)"].apply(lambda x: parse_duration(x))
-    video_analysis_df["Program duration(sec)"] = video_analysis_df["Program duration"].apply(lambda x: parse_duration(x))
+    video_analysis_df["Program duration(sec)"] = video_analysis_df["Program duration"].apply(
+        lambda x: parse_duration(x))
     video_analysis_df["Ats(viewer)%"] = (
         100 * video_analysis_df["Ats(viewer)(sec)"]/video_analysis_df["Program duration(sec)"])
     
     # create metadata df
-    metadata_df = video_analysis_df[["key", "Year", "Program name", "Programme Language", "Program Theme", "Channel", 
-                                    "Ats(viewer)%", "rat%/AP", "Daily Avg Rch%"]].copy()
-    metadata_df.columns = ["key", "year", "program", "lang", "genre", "channel", "ats", "rating", "reach"]
+    metadata_df = video_analysis_df[["file_key", "youtube_key", "Year", "Program name", "Programme Language", 
+                                     "Program Theme", "Channel", "Ats(viewer)%", "rat%/AP", "Daily Avg Rch%"]].copy()
+    metadata_df.columns = ["file_key", "youtube_key", "year", "program", "lang", "genre", "channel", "ats", 
+                           "rating", "reach"]
 
     # create faces data
     # n_faces_arr[i, j, k, l] = number of faces of gender j and age k and skintone l in video i
@@ -112,6 +120,7 @@ def prepare_data():
     wide_video_df = pd.DataFrame(wide_video_rows, columns=metadata_df.columns.tolist()
                                 + ["male_faces", "female_faces", "young_faces", "adult_faces", "middle_aged_faces",
                                 "old_faces", "light_faces", "medium_faces", "dark_faces", "faces"])
+    print(f"{len(wide_video_df)} video samples")
 
     # create language analysis dataframe in wide form
     rows = []
@@ -120,8 +129,8 @@ def prepare_data():
             "hindu_name", "muslim_name", "christian_name",
             "transcript", "non_stopword_transcript"]
 
-    for _, row in language_analyis_df.iterrows():
-        key = row["Video ID"]
+    for _, row in language_analysis_df.iterrows():
+        key = row["key"]
         lang = row["Language"]
 
         # derogatory words
@@ -174,8 +183,13 @@ def prepare_data():
     wide_lang_df = wide_lang_df[wide_lang_df["transcript"] >= 100]
 
     # join wide form of video and language analysis dataframes
-    wide_video_lang_df =  wide_video_df.merge(wide_lang_df, how="inner", on=["key", "lang"], suffixes=("_vd", "_ln"))
+    wide_video_lang_df1 =  wide_video_df.merge(wide_lang_df, how="inner", left_on=["youtube_key", "lang"], 
+                                               right_on=["key", "lang"], suffixes=("_vd", "_ln"))
+    wide_video_lang_df2 =  wide_video_df.merge(wide_lang_df, how="inner", left_on=["file_key", "lang"], 
+                                               right_on=["key", "lang"], suffixes=("_vd", "_ln"))
+    wide_video_lang_df = pd.concat((wide_video_lang_df1, wide_video_lang_df2))
     wide_video_lang_df.to_csv("data/wide_lang.csv", index=False)
+    print(f"{len(wide_video_lang_df)} language samples")
 
     # create language long form for religious person names
     rows = []
